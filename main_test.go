@@ -7,14 +7,14 @@ import (
 	"time"
 )
 
-type mockRequestor struct {}
+type mockRequestor struct{}
 
 func (m *mockRequestor) get(url string) ([]byte, error) {
-	time.Sleep(time.Millisecond * 10)
-	return []byte{}, nil
+	time.Sleep(time.Second)
+	return []byte(url + "hash"), nil
 }
 
-func Test_General_Success(t *testing.T) {
+func test_General_Success(t *testing.T) {
 	var (
 		parallelLimit = 5
 		pairs         = make(chan string, parallelLimit)
@@ -43,27 +43,28 @@ type mockWaiter struct {
 	doneChan chan struct{}
 }
 
-func (m mockWaiter) Add(i int) {}
-
-func (m mockWaiter) Done() {
+func (m mockWaiter) Add(i int) {
 	m.doneChan <- struct{}{}
 }
 
-// Wait must be called when parallel limit has reached or fail
+func (m mockWaiter) Done() {
+	<-m.doneChan
+}
+
 func (m mockWaiter) Wait() {
-	counter := 0
-	for range m.doneChan {
-		if counter > (m.limit - 1) {
-			m.t.Fatal("limiting the number of parallel requests is failed")
+	time.Sleep(time.Millisecond * 10)
+	for {
+		if len(m.doneChan) == 0 {
+			fmt.Println("WAIT!")
+			return
 		}
-		counter++
+		time.Sleep(time.Second*2)
 	}
 }
 
 func Test_UrlsMoreThanLimit_Success(t *testing.T) {
 	var (
 		parallelLimit = 5
-		pairs         = make(chan string, parallelLimit)
 		urls          = []string{
 			"http://google.com",
 			"http://ya.ru",
@@ -76,30 +77,71 @@ func Test_UrlsMoreThanLimit_Success(t *testing.T) {
 			"http://instagram.com",
 			"http://google.com",
 			"http://google.com",
+			"http://google.com",
+			"http://ya.ru",
+			"http://yahoo.com",
+			"http://google.com",
+			"http://amazon.com",
+			"http://google.com",
+			"http://vk.com",
+			"http://google.com",
+			"http://instagram.com",
+			"http://google.com",
+			"http://google.com",
+			"http://google.com",
+			"http://ya.ru",
+			"http://yahoo.com",
+			"http://google.com",
+			"http://amazon.com",
+			"http://google.com",
+			"http://vk.com",
+			"http://google.com",
+			"http://instagram.com",
+			"http://google.com",
+			"http://google.com",
+			"http://google.com",
+			"http://ya.ru",
+			"http://yahoo.com",
+			"http://google.com",
+			"http://amazon.com",
+			"http://google.com",
+			"http://vk.com",
+			"http://google.com",
+			"http://instagram.com",
+			"http://google.com",
+			"http://google.com",
+			"http://google.com",
+			"http://ya.ru",
+			"http://yahoo.com",
+			"http://google.com",
+			"http://amazon.com",
+			"http://google.com",
+			"http://vk.com",
+			"http://google.com",
+			"http://instagram.com",
+			"http://google.com",
+			"http://google.com",
 		}
+		pairs  = make(chan string, len(urls))
 		mockWg = mockWaiter{
 			t:        t,
 			limit:    parallelLimit,
 			doneChan: make(chan struct{}, parallelLimit),
 		}
-		builder        = NewHashBuilder(&mockRequestor{}, parallelLimit, &mockWg)
-		requestCounter int
+		builder = NewHashBuilder(&mockRequestor{}, parallelLimit, &mockWg)
 	)
-	defer close(mockWg.doneChan)
 
 	go builder.build(urls, pairs)
 	for {
 		select {
-		case <-pairs:
-			// only first limited batch of pairs that were received before Wait call
-			requestCounter++
-
-			if requestCounter == parallelLimit {
+		case <-time.After(time.Minute):
+			t.Fatal("timeout")
+		default:
+			fmt.Println(len(pairs), "RECEIVED")
+			if len(pairs) == len(urls) {
 				return
 			}
-
-		case <-time.After(5 * time.Second):
-			t.Fatal("timeout")
 		}
+		time.Sleep(time.Second)
 	}
 }
